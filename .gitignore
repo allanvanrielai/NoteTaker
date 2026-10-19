@@ -14,6 +14,9 @@ Desktop.ini
 # Logs
 *.log
 
+# Local Claude Code permission settings (machine-specific)
+.claude/settings.local.json
+
 # Windows shortcuts
 *.lnk
 
