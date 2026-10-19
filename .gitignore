@@ -1,0 +1,34 @@
+# OS clutter
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor clutter
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Windows shortcuts
+*.lnk
+
+# User data: notes, backups, exports. Never commit.
+DATA/
+
+# Share package output (zips and the Share build folder)
+Share/
+The_Share.zip
+*.zip
+
+# Test and scratch output
+Testing/GTEST4/
+Testing/tmp/
+Testing/output/
+*.tmp
+*.bak
+node_modules/

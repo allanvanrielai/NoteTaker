@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>File handle test harness</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; max-width: 1000px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  #hdr { background: #f2f2f2; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+  .slot { border: 1px solid #bbb; border-radius: 4px; padding: 8px; margin: 10px 0; }
+  .slot h2 { font-size: 14px; margin: 0 0 4px; }
+  textarea { width: 100%; height: 60px; box-sizing: border-box; }
+  button { margin: 4px 4px 4px 0; padding: 4px 10px; }
+  .status { font-family: monospace; font-size: 12px; background: #eef6ff; padding: 4px; margin-top: 4px; white-space: pre-wrap; }
+  #log { height: 320px; overflow: auto; background: #111; color: #ddd; font: 12px/1.35 monospace; padding: 6px; white-space: pre-wrap; }
+  .err { color: #ff8080; } .ok { color: #8fe08f; } .warn { color: #ffd479; }
+</style>
+</head>
+<body>
+<h1>File System Access handle test harness (throwaway)</h1>
+<div id="hdr"></div>
+
+<div id="slots"></div>
+
+<p>
+  <button id="clearLog">Clear log</button>
+  <button id="copyLog">Copy log to clipboard</button>
+  <button id="recheckAll">Re-query all permissions</button>
+  <button id="wipeDb">Wipe IndexedDB (all slots)</button>
+</p>
+<div id="log"></div>
+
+<script>
+"use strict";
+const DB_NAME = "handleTest", STORE = "handles", DIALOG_ID = "notetakertest";
+const SLOTS = [1, 2, 3];
+const handles = {};   // slot -> FileSystemFileHandle (in memory)
+const $ = (id) => document.getElementById(id);
+
+// ---------- logging ----------
+const logEl = $("log"), logLines = [];
+function log(msg, cls) {
+  const line = new Date().toISOString().slice(11, 23) + "  " + msg;
+  logLines.push(line);
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = line;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+const errStr = (e) => (e && e.name ? e.name : typeof e) + ": " + (e && e.message ? e.message : String(e));
+
+// ---------- header ----------
+$("hdr").textContent =
+  "userAgent: " + navigator.userAgent + "\n" +
+  "location.protocol: " + location.protocol + "\n" +
+  "location.href: " + location.href + "\n" +
+  "origin: " + String(location.origin) + "   isSecureContext: " + window.isSecureContext;
+
+// ---------- feature checks ----------
+const has = {
+  picker: typeof window.showSaveFilePicker === "function",
+  idb: (function () { try { return !!window.indexedDB; } catch (e) { return false; } })(),
+  queryPerm: typeof FileSystemFileHandle !== "undefined" && typeof FileSystemFileHandle.prototype.queryPermission === "function",
+  reqPerm: typeof FileSystemFileHandle !== "undefined" && typeof FileSystemFileHandle.prototype.requestPermission === "function"
+};
+log("feature showSaveFilePicker: " + has.picker, has.picker ? "ok" : "err");
+log("feature indexedDB: " + has.idb, has.idb ? "ok" : "err");
+log("feature FileSystemFileHandle.queryPermission: " + has.queryPerm, has.queryPerm ? "ok" : "err");
+log("feature FileSystemFileHandle.requestPermission: " + has.reqPerm, has.reqPerm ? "ok" : "err");
+
+// ---------- IndexedDB ----------
+let dbPromise = null;
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    if (!has.idb) return reject(new Error("indexedDB missing"));
+    let req;
+    try { req = indexedDB.open(DB_NAME, 1); } catch (e) { return reject(e); }
+    req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error("indexedDB open blocked"));
+  });
+  return dbPromise;
+}
+async function idb(mode, fn) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, mode);
+    const r = fn(tx.objectStore(STORE));
+    tx.oncomplete = () => resolve(r && r.result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("tx aborted"));
+  });
+}
+const idbPut = (slot, h) => idb("readwrite", (s) => s.put(h, "slot" + slot));
+const idbGet = (slot) => idb("readonly", (s) => s.get("slot" + slot));
+const idbDel = (slot) => idb("readwrite", (s) => s.delete("slot" + slot));
+
+// ---------- UI ----------
+function setStatus(slot, text) { $("status" + slot).textContent = text; }
+
+SLOTS.forEach((n) => {
+  const div = document.createElement("div");
+  div.className = "slot";
+  div.innerHTML =
+    "<h2>Slot " + n + "</h2>" +
+    '<textarea id="ta' + n + '">Slot ' + n + ' test content</textarea><br>' +
+    '<button id="saveAs' + n + '">Save As</button>' +
+    '<button id="save' + n + '">Save</button>' +
+    '<button id="check' + n + '">Check (query perm + read file)</button>' +
+    '<button id="forget' + n + '">Forget</button>' +
+    '<div class="status" id="status' + n + '">(no handle)</div>';
+  $("slots").appendChild(div);
+  $("saveAs" + n).onclick = () => saveAs(n);
+  $("save" + n).onclick = () => save(n);
+  $("check" + n).onclick = () => check(n);
+  $("forget" + n).onclick = () => forget(n);
+});
+
+async function queryPerm(slot, h) {
+  const t = "slot" + slot + " queryPermission({mode:'readwrite'})";
+  try {
+    const p = await h.queryPermission({ mode: "readwrite" });
+    log(t + " -> " + p, "ok");
+    return p;
+  } catch (e) { log(t + " THREW " + errStr(e), "err"); return "error"; }
+}
+async function refreshStatus(slot) {
+  const h = handles[slot];
+  if (!h) return setStatus(slot, "(no handle)");
+  const p = has.queryPerm ? await queryPerm(slot, h) : "n/a";
+  setStatus(slot, "name: " + h.name + "\npermission: " + p);
+  return p;
+}
+
+// ---------- operations ----------
+async function persist(slot, h) {
+  try { await idbPut(slot, h); log("slot" + slot + " IndexedDB put OK", "ok"); }
+  catch (e) { log("slot" + slot + " IndexedDB put FAILED " + errStr(e), "err"); }
+}
+
+async function saveAs(slot) {
+  if (!has.picker) { log("showSaveFilePicker missing", "err"); return setStatus(slot, "showSaveFilePicker missing"); }
+  const suggestedName = "TestSlot" + slot + "_" + new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14) + ".txt";
+  const opts = {
+    suggestedName,
+    id: DIALOG_ID,
+    startIn: "documents",
+    types: [{ description: "Text files", accept: { "text/plain": [".txt"] } }],
+    excludeAcceptAllOption: true
+  };
+  log("slot" + slot + " showSaveFilePicker(" + JSON.stringify(opts) + ")");
+  let h;
+  try { h = await window.showSaveFilePicker(opts); }
+  catch (e) {
+    log("slot" + slot + " showSaveFilePicker FAILED " + errStr(e), e.name === "AbortError" ? "warn" : "err");
+    setStatus(slot, "Save As failed: " + errStr(e));
+    return false;
+  }
+  log("slot" + slot + " picker returned; handle.name = '" + h.name + "' (suggested '" + suggestedName + "')", "ok");
+  handles[slot] = h;
+  await persist(slot, h);
+  const ok = await writeFile(slot, h);
+  await refreshStatus(slot);
+  return ok;
+}
+
+async function writeFile(slot, h) {
+  const text = $("ta" + slot).value;
+  try {
+    const w = await h.createWritable();
+    await w.write(text);
+    await w.close();
+    log("slot" + slot + " write OK (" + text.length + " chars) to '" + h.name + "'", "ok");
+    return true;
+  } catch (e) {
+    log("slot" + slot + " write FAILED " + errStr(e), "err");
+    setStatus(slot, "Write failed: " + errStr(e));
+    return false;
+  }
+}
+
+async function save(slot) {
+  const h = handles[slot];
+  if (!h) { log("slot" + slot + " Save: no handle, falling back to Save As", "warn"); return saveAs(slot); }
+  let perm = "prompt";
+  if (has.queryPerm) perm = await queryPerm(slot, h);
+  else log("queryPermission missing; attempting write anyway", "warn");
+
+  if (perm === "prompt") {
+    log("slot" + slot + " calling requestPermission({mode:'readwrite'}) from click handler");
+    try {
+      perm = await h.requestPermission({ mode: "readwrite" });
+      log("slot" + slot + " requestPermission -> " + perm, perm === "granted" ? "ok" : "warn");
+    } catch (e) {
+      log("slot" + slot + " requestPermission THREW " + errStr(e) + " -> fallback to Save As", "err");
+      setStatus(slot, "requestPermission threw: " + errStr(e));
+      return saveAs(slot);
+    }
+  }
+  if (perm === "denied" || perm === "error" || (perm !== "granted" && has.queryPerm)) {
+    log("slot" + slot + " permission '" + perm + "' -> fallback to Save As", "err");
+    return saveAs(slot);
+  }
+  const ok = await writeFile(slot, h);
+  if (!ok) log("slot" + slot + " (write failed; NOT auto falling back so the exact error is preserved. Use Save As manually.)", "warn");
+  await refreshStatus(slot);
+  return ok;
+}
+
+async function check(slot) {
+  const h = handles[slot];
+  if (!h) return log("slot" + slot + " Check: no handle", "warn");
+  await refreshStatus(slot);
+  try {
+    const f = await h.getFile();
+    log("slot" + slot + " getFile OK: name=" + f.name + " size=" + f.size + " lastModified=" + new Date(f.lastModified).toISOString(), "ok");
+  } catch (e) { log("slot" + slot + " getFile FAILED " + errStr(e), "err"); }
+}
+
+async function forget(slot) {
+  delete handles[slot];
+  try { await idbDel(slot); log("slot" + slot + " forgotten (IndexedDB entry deleted)", "ok"); }
+  catch (e) { log("slot" + slot + " IndexedDB delete FAILED " + errStr(e), "err"); }
+  setStatus(slot, "(no handle)");
+}
+
+$("clearLog").onclick = () => { logEl.textContent = ""; logLines.length = 0; };
+$("copyLog").onclick = async () => {
+  try { await navigator.clipboard.writeText(logLines.join("\n")); log("log copied", "ok"); }
+  catch (e) { log("clipboard failed " + errStr(e) + " (select the log text manually)", "err"); }
+};
+$("recheckAll").onclick = () => SLOTS.forEach((n) => refreshStatus(n));
+$("wipeDb").onclick = async () => {
+  for (const n of SLOTS) await forget(n);
+};
+
+// ---------- load: restore handles, report permission, NEVER requestPermission ----------
+(async function init() {
+  if (!has.idb) return log("IndexedDB unavailable; cannot restore handles", "err");
+  try { await openDb(); log("IndexedDB open OK (db '" + DB_NAME + "')", "ok"); }
+  catch (e) { return log("IndexedDB open FAILED " + errStr(e), "err"); }
+  for (const n of SLOTS) {
+    let h;
+    try { h = await idbGet(n); }
+    catch (e) { log("slot" + n + " IndexedDB get FAILED " + errStr(e), "err"); continue; }
+    if (!h) { log("slot" + n + " no stored handle"); continue; }
+    handles[n] = h;
+    log("slot" + n + " restored handle from IndexedDB: name='" + h.name + "' kind=" + h.kind, "ok");
+    if (has.queryPerm) await refreshStatus(n);
+    else setStatus(n, "name: " + h.name + "\npermission: queryPermission missing");
+  }
+  if (!Object.keys(handles).length) log("no handles restored on load");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "light": {
+    "LINE_LIGHT": "#626E73",
+    "ACCENT_LIGHT": "#184B9A",
+    "ACTIVE_LIGHT": "#FFFFFF",
+    "ICON_LIGHT": "#184B9A",
+    "OK_LIGHT": "#217a3c",
+    "BAD_LIGHT": "#c62828",
+    "WARN_LIGHT": "#9a5b00",
+    "WARNBG_LIGHT": "#fff4d6",
+    "WARNLINE_LIGHT": "#9a5b00",
+    "ERRBG_LIGHT": "#fde4e4",
+    "ERRLINE_LIGHT": "#c62828"
+  },
+  "dark_block": "    --bg: #243C7A; --card: #184B9A; --field: #243C7A; --field-locked: #184B9A;\n    --text: #FFFFFF; --muted: #CFD8DB; --heading: #FFFFFF;\n    --line: #85C4EB; --card-line: transparent;\n    --accent: #F48130; --accent-bg: rgba(255, 255, 255, .14); --focus: #85C4EB; --icon: #85C4EB; --active-bg: #243C7A;\n    --cta-bg: #F48130; --cta-text: #243C7A; --btn-bg: #184B9A; --btn-text: #FFFFFF; --btn-line: #65A1D7;\n    --sig: transparent;\n    --ok: #6fcf8a; --bad: #ff8a80;\n    --warn: #ffc766; --warn-bg: #3b3317; --warn-line: #ffc766; --err-bg: #3d1d1d; --err-line: #ff9d94;\n    --logo-plate: #CFD8DB; --logo-plate-pad: 14px 22px;\n    color-scheme: dark;"
+}

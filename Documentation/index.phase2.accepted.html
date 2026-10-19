@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NoteTaker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --line: #c9ced6; --text: #1d2129; --muted: #5d6573;
+    --accent: #1a5fd0; --warn-bg: #fff4d6; --warn-line: #e0b84a; --err-bg: #fde4e4; --err-line: #d65a5a;
+    --ok: #217a3c; --accent-bg: #e6efff; --warn: #b26a00;
+    --cardw: 1060px; --idxw: 528px; --texth: 400px; --fs: 14px; --hdr: 52px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d; --card: #20242b; --line: #3a404b; --text: #e8eaee; --muted: #9aa3b2;
+      --accent: #6aa0ff; --warn-bg: #3b3317; --warn-line: #8a7324; --err-bg: #3d1d1d; --err-line: #9a4343;
+      --ok: #6fcf8a; --accent-bg: #26324a; --warn: #ffb84d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; height: var(--hdr); background: var(--bg); border-bottom: 1px solid var(--line);
+           padding: 0 16px; display: flex; flex-wrap: nowrap; gap: 12px; align-items: center; }
+  h1 { font-size: 18px; margin: 0; }
+  button { font: inherit; padding: 4px 10px; border: 1px solid var(--line); border-radius: 4px;
+           background: var(--card); color: var(--text); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #count, #backup { color: var(--muted); font-size: 12px; }
+  #backup.ok { color: var(--ok); } #backup.bad { color: #d33; font-weight: 600; }
+  .banner { margin: 10px 16px 0; padding: 8px 12px; border-radius: 4px; border: 1px solid; }
+  .banner.warn { background: var(--warn-bg); border-color: var(--warn-line); }
+  .banner.err { background: var(--err-bg); border-color: var(--err-line); }
+  #empty { margin: 32px 16px; color: var(--muted); }
+  #layout { display: grid; grid-template-columns: minmax(0, var(--cardw)) minmax(240px, var(--idxw)); justify-content: center;
+            gap: 16px; padding: 14px 16px 60px; align-items: start; }
+  #grid { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  @media (max-width: 900px) { #layout { grid-template-columns: minmax(0, 1fr); } #side { position: static; max-height: none; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;
+          scroll-margin-top: calc(var(--hdr) + 12px); }
+  .card.flash { animation: flash 1.1s ease-out; }
+  @keyframes flash { 0% { background: var(--accent-bg); } 100% { background: var(--card); } }
+  .title { width: 100%; font: inherit; font-weight: 600; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px;
+           background: transparent; color: var(--text); }
+  .btns { display: flex; flex-wrap: wrap; gap: 4px; }
+  textarea.body { width: 100%; height: var(--texth); resize: vertical; overflow: auto; padding: 8px; font: var(--fs)/1.45 Consolas, "Courier New", monospace;
+                  border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--text); }
+  .btnwrap { position: relative; display: inline-block; }
+  .toast { position: absolute; left: 0; top: calc(100% + 3px); z-index: 4; white-space: nowrap; pointer-events: none;
+           background: var(--text); color: var(--bg); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+  .badge { color: var(--warn); font-weight: 600; }
+  .titlerow { display: flex; gap: 6px; align-items: center; }
+  .titlerow .title { flex: 1; min-width: 0; }
+  .title[readonly] { background: color-mix(in srgb, var(--line) 25%, transparent); }
+  .lock { flex: none; font-size: 15px; }
+  .small { font-size: 11px; color: var(--muted); margin-top: -2px; }
+  .cardstatus:empty { display: none; }
+  .panel { border: 1px solid var(--err-line); background: var(--err-bg); border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .panel.warn { border-color: var(--warn-line); background: var(--warn-bg); }
+  .panel .pmsg { font-size: 13px; }
+  .panel .pbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+  #side { position: sticky; top: calc(var(--hdr) + 10px); max-height: calc(100vh - var(--hdr) - 24px); display: flex; flex-direction: column; min-width: 0; }
+  #side .box { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  #side h2 { font-size: 13px; margin: 0; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  #index { list-style: none; margin: 0; padding: 0; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+  #index li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: 4px; cursor: pointer; border: 1px solid transparent; }
+  #index li:hover { border-color: var(--line); }
+  #index li.active { background: var(--accent-bg); border-color: var(--accent); }
+  #index .ic { width: 18px; text-align: center; flex: none; color: var(--accent); font-size: 13px; }
+  #index .ib { min-width: 0; flex: 1; }
+  #index .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #index .t.untitled { font-weight: 400; font-style: italic; color: var(--muted); }
+  #index .s { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NoteTaker</h1>
+  <button id="newCard" class="primary">New container</button>
+  <span id="count"></span>
+  <span id="backup" class="ok">Backup: starting…</span>
+</header>
+<div id="banners"></div>
+<div id="empty" hidden>No containers yet. Click <b>New container</b> to start.</div>
+<div id="layout">
+  <main id="grid"></main>
+  <aside id="side">
+    <div class="box">
+      <h2>Containers</h2>
+      <ul id="index"></ul>
+    </div>
+  </aside>
+</div>
+
+<script>
+"use strict";
+
+// ===== <pure-logic> (no DOM or storage access; unit-tested by Testing/phase1-unit.mjs) =====
+function countWords(text) { const t = text.trim(); return t ? t.split(/\s+/).length : 0; }
+function countChars(text) { return Array.from(text).length; }           // includes spaces
+function pad2(n) { return String(n).padStart(2, "0"); }
+function formatStamp(ms) {
+  const d = new Date(ms);
+  return d.getFullYear() + "/" + pad2(d.getMonth() + 1) + "/" + pad2(d.getDate()) + " " +
+         pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+}
+// "" = nothing to flag, "never-saved" = text exists but was never saved to a file, "unsaved" = differs from last saved text
+function unsavedState(card) {
+  if (card.savedText === null) return card.text === "" ? "" : "never-saved";
+  return card.text !== card.savedText ? "unsaved" : "";
+}
+function newCard(now, id) {
+  return { id: id, title: "", text: "", createdAt: now, lastEdited: now,
+           savedText: null, pinned: false, collapsed: false };
+}
+const CARD_DEFAULTS = { title: "", text: "", savedText: null, pinned: false, collapsed: false, locked: false, fileName: null, lastModified: null, savedAt: null };
+function normalizeCard(c) { return Object.assign({}, CARD_DEFAULTS, c); }   // cards stored by an earlier phase gain the new fields
+const RESERVED_NAME = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+// File-name-safe version of a title: removes \ / : * ? " < > | and control characters, trims spaces, removes trailing dots,
+// caps at 100 characters, and prefixes "_" to Windows reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9). Returns "" if nothing is left.
+function sanitizeTitle(title) {
+  const trimEnd = (x) => x.replace(/[\s.]+$/, "");
+  let s = String(title).replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, "").replace(/^\s+/, "");
+  s = trimEnd(s);
+  s = trimEnd(Array.from(s).slice(0, 100).join(""));
+  if (!s) return "";
+  if (RESERVED_NAME.test(s.split(".")[0])) s = "_" + s;
+  return s;
+}
+function defaultFileName(title, now) {
+  const base = sanitizeTitle(title);
+  if (!base) {
+    const d = new Date(now);
+    return "User_Text_" + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "_" + pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds()) + ".txt";
+  }
+  return /\.(txt|md)$/i.test(base) ? base : base + ".txt";
+}
+function stripExtension(name) { const r = name.replace(/\.[^./\\]+$/, ""); return r || name; }
+// Steps 1 and 2 of the save routine. file = { ok: true, lastModified } or { ok: false, errorName }.
+function checkBeforeWrite(file, storedLastModified) {
+  if (!file.ok) return file.errorName === "NotFoundError" ? { action: "missing" } : { action: "unreadable", errorName: file.errorName };
+  if (storedLastModified === null || file.lastModified !== storedLastModified) return { action: "changed" };
+  return { action: "write" };
+}
+// Step 3: what a failed write means.
+function classifyWriteError(name) {
+  if (name === "InvalidStateError" || name === "NoModificationAllowedError") return "locked";
+  if (name === "NotFoundError") return "missing";
+  if (name === "NotAllowedError" || name === "SecurityError") return "permission";
+  return "error";
+}
+function failureMessage(kind, fileName, extra) {
+  const n = '"' + fileName + '"';
+  const safe = " Your text is safe in this container.";
+  if (kind === "missing") return "The file " + n + " was renamed, moved or deleted." + safe;
+  if (kind === "changed") return "The file " + n + " was changed outside NoteTaker since your last save. Saving now would overwrite those changes." + safe;
+  if (kind === "locked") return "NoteTaker could not write to " + n + ". It may be open in another program, or it changed while saving. Nothing was overwritten." + safe;
+  if (kind === "permission") return "NoteTaker needs your permission to save " + n + ".";
+  if (kind === "linklost") return "The link to the file " + n + " was lost (browser data may have been cleared)." + safe + " Use Save As to link a file again.";
+  if (kind === "samefile") return n + " is also linked to the container \"" + extra + "\". Saving from both will overwrite each other's text.";
+  return "Saving " + n + " failed (" + extra + ")." + safe;
+}
+function displayOrder(cards) {   // Phase 1: newest created first (sort modes arrive in Phase 3)
+  return cards.slice().sort((a, b) => (b.createdAt - a.createdAt) || (a.id < b.id ? -1 : 1));
+}
+// ===== </pure-logic> =====
+
+const $ = (id) => document.getElementById(id);
+const errStr = (e) => (e && e.name ? e.name : typeof e) + ": " + (e && e.message ? e.message : String(e));
+const cards = new Map();          // id -> card (in memory, source of truth for the UI)
+const els = new Map();            // id -> { root, title, body, meta, li, lock, small, status }
+const handles = new Map();        // card id -> FileSystemFileHandle (in memory; also stored in IndexedDB "handles")
+const busy = new Set();           // card ids with a save in progress
+let lastHandle = null;            // most recent file saved to; used as the Save As starting folder
+
+// ---------- banners ----------
+function banner(kind, text) {
+  const d = document.createElement("div");
+  d.className = "banner " + kind;
+  d.textContent = text;
+  $("banners").appendChild(d);
+  return d;
+}
+
+// ---------- IndexedDB ----------
+const DB_NAME = "notetaker", DB_VERSION = 1;
+let dbPromise = null;
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    let req;
+    try { req = indexedDB.open(DB_NAME, DB_VERSION); } catch (e) { return reject(e); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      db.createObjectStore("cards", { keyPath: "id" });
+      db.createObjectStore("handles");      // key = card id; used from Phase 2
+      db.createObjectStore("meta");
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error("indexedDB open blocked"));
+  });
+  return dbPromise;
+}
+async function dbTx(stores, mode, fn) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(stores, mode);
+    const r = fn(tx);
+    tx.oncomplete = () => resolve(r && r.result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("transaction aborted"));
+  });
+}
+const dbAllCards = () => dbTx(["cards"], "readonly", (tx) => tx.objectStore("cards").getAll());
+const dbPutCards = (list) => dbTx(["cards"], "readwrite", (tx) => { const s = tx.objectStore("cards"); list.forEach((c) => s.put(c)); });
+const dbPutHandle = (key, h) => dbTx(["handles"], "readwrite", (tx) => tx.objectStore("handles").put(h, key));
+const dbAllHandles = () => dbTx(["handles"], "readonly", (tx) => { const st = tx.objectStore("handles"), k = st.getAllKeys(), v = st.getAll();
+  return { get result() { return k.result.map((key, i) => [key, v.result[i]]); } }; });
+const dbDeleteCard = (id) => dbTx(["cards", "handles"], "readwrite", (tx) => { tx.objectStore("cards").delete(id); tx.objectStore("handles").delete(id); });
+
+// ---------- crash backup: every change is written to IndexedDB within ~250 ms ----------
+const FLUSH_MS = 0;    // next event-loop turn: coalesces one burst of input events, but shrinks the loss window to a few ms (a 250 ms debounce lost text typed <150 ms before closing the tab)
+const dirty = new Set();
+let flushTimer = null, flushChain = Promise.resolve(), backupBroken = false;
+
+function setBackup(state) {
+  const el = $("backup");
+  if (state === "ok")      { el.className = "ok";  el.textContent = "Backup: up to date"; }
+  if (state === "pending") { el.className = "ok";  el.textContent = "Backup: writing…"; }
+  if (state === "failed")  { el.className = "bad"; el.textContent = "BACKUP FAILED: text is not protected"; }
+}
+function markDirty(id) {
+  dirty.add(id);
+  if (!backupBroken) setBackup("pending");
+  if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS);   // not reset on each keystroke, so a long typing burst still flushes
+}
+function flush() {
+  clearTimeout(flushTimer); flushTimer = null;
+  flushChain = flushChain.then(async () => {
+    if (!dirty.size) return;
+    const ids = [...dirty]; dirty.clear();
+    const batch = ids.map((id) => cards.get(id)).filter(Boolean);
+    try {
+      await dbPutCards(batch);
+      backupBroken = false;
+      if (!dirty.size) setBackup("ok");
+    } catch (e) {
+      ids.forEach((id) => dirty.add(id));      // keep them dirty so the next flush retries
+      backupBroken = true; setBackup("failed");
+      console.error("backup failed", e);
+      flushTimer = flushTimer || setTimeout(flush, 2000);
+    }
+  });
+  return flushChain;
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); });
+window.addEventListener("pagehide", () => { flush(); });
+
+// ---------- UI ----------
+function updateMeta(card) {
+  const e = els.get(card.id); if (!e) return;
+  const state = unsavedState(card);
+  e.meta.textContent = "";
+  const parts = [countWords(card.text) + " words", countChars(card.text) + " chars", "Edited " + formatStamp(card.lastEdited)];
+  if (card.savedAt) parts.push("Saved " + formatStamp(card.savedAt).slice(11));
+  parts.forEach((p) => { const s = document.createElement("span"); s.textContent = p; e.meta.appendChild(s); });
+  if (state) {
+    const b = document.createElement("span"); b.className = "badge";
+    b.textContent = state === "never-saved" ? "Not saved to a file" : "Unsaved changes";
+    e.meta.appendChild(b);
+  }
+}
+function indexLabel(card) { return card.title.trim() || "Untitled"; }
+function updateIndexItem(card) {
+  const e = els.get(card.id); if (!e || !e.li) return;
+  const t = e.li.querySelector(".t"); t.textContent = (card.locked ? "🔒 " : "") + indexLabel(card); t.classList.toggle("untitled", !card.title.trim());
+  const s = e.li.querySelector(".s"); s.textContent = "";
+  const add = (txt, cls) => { const x = document.createElement("span"); x.textContent = txt; if (cls) x.className = cls; s.appendChild(x); };
+  add(countWords(card.text) + " words"); add(formatStamp(card.lastEdited).slice(11, 16));
+  const st = unsavedState(card); if (st) add(st === "never-saved" ? "no file" : "unsaved", "badge");
+}
+function buildIndexItem(card) {
+  const li = document.createElement("li"); li.dataset.id = card.id;
+  const ic = document.createElement("span"); ic.className = "ic"; ic.textContent = "●";
+  const ib = document.createElement("div"); ib.className = "ib";
+  const t = document.createElement("div"); t.className = "t"; const s = document.createElement("div"); s.className = "s";
+  ib.append(t, s); li.append(ic, ib);
+  li.addEventListener("click", () => goTo(card.id));
+  return li;
+}
+function goTo(id) {
+  const e = els.get(id); if (!e) return;
+  e.root.scrollIntoView({ behavior: "smooth", block: "start" });
+  e.root.classList.remove("flash"); void e.root.offsetWidth; e.root.classList.add("flash");
+  lockId = id; lockY = null; clearTimeout(lockTimer); lockTimer = setTimeout(settleLock, 250);
+  setActive(id);      // stays highlighted until the user scrolls away (see below)
+}
+// Bring a whole container into view (moving the page only as far as needed) when the user works in it.
+// Buttons are excluded: moving the page under the pointer between mouse-down and mouse-up would lose the click.
+const HDR_PX = 52, EDGE_PX = 12;   // HDR_PX matches --hdr
+function ensureVisible(id) {
+  const e = els.get(id); if (!e) return;
+  const r = e.root.getBoundingClientRect(), top = HDR_PX + EDGE_PX, bottom = innerHeight - EDGE_PX;
+  let dy = 0;
+  if (r.height > bottom - top) { if (r.top < top) dy = r.top - top; }        // taller than the screen: show its top, never fight the user
+  else if (r.top < top) dy = r.top - top;
+  else if (r.bottom > bottom) dy = r.bottom - bottom;
+  if (Math.abs(dy) > 1) window.scrollBy({ top: dy, behavior: "smooth" });
+}
+let lastPointerAt = 0;
+document.addEventListener("pointerdown", () => { lastPointerAt = Date.now(); }, true);
+function setActive(id) { els.forEach((e, k) => { if (e.li) e.li.classList.toggle("active", k === id); }); }
+// Which header is highlighted: the container being read. A clicked header stays highlighted while its container is on screen,
+// because the end of the page cannot always scroll it up to the reading line. Wheel, touch or keys release that.
+let lockId = null, lockY = null, lockTimer = 0, activeRaf = 0;
+function settleLock() { lockY = scrollY; }   // the click's own scroll has finished; any later movement is the user's
+function pickActive() {
+  activeRaf = 0;
+  const kids = [...$("grid").children]; if (!kids.length) return;
+  const hdr = HDR_PX, vh = innerHeight;
+  if (lockId) {
+    const e = els.get(lockId);
+    if (e) { const r = e.root.getBoundingClientRect(); if (r.bottom > hdr && r.top < vh) return setActive(lockId); }
+    lockId = null;
+  }
+  let chosen = kids[0].dataset.id;
+  for (const k of kids) if (k.getBoundingClientRect().top <= hdr + vh * 0.3) chosen = k.dataset.id;
+  if (scrollY + vh >= document.documentElement.scrollHeight - 2) chosen = kids[kids.length - 1].dataset.id;
+  setActive(chosen);
+}
+function schedulePick() { if (!activeRaf) activeRaf = requestAnimationFrame(pickActive); }
+window.addEventListener("scroll", () => {
+  if (lockId) {
+    if (lockY === null) { clearTimeout(lockTimer); lockTimer = setTimeout(settleLock, 150); }   // still scrolling to the clicked container
+    else if (Math.abs(scrollY - lockY) > 4) lockId = null;                                       // user moved the page (wheel, scrollbar, keys)
+  }
+  schedulePick();
+}, { passive: true });
+window.addEventListener("resize", schedulePick);
+["wheel", "touchmove", "keydown"].forEach((ev) => window.addEventListener(ev, () => { lockId = null; }, { passive: true }));
+function updateChrome() {
+  const n = cards.size;
+  $("count").textContent = n + (n === 1 ? " container" : " containers");
+  $("empty").hidden = n > 0;
+}
+function touch(card) { card.lastEdited = Date.now(); markDirty(card.id); updateMeta(card); updateIndexItem(card); }
+
+function buildCard(card) {
+  const root = document.createElement("article");
+  root.className = "card"; root.dataset.id = card.id;
+
+  const titleRow = document.createElement("div"); titleRow.className = "titlerow";
+  const title = document.createElement("input");
+  title.className = "title"; title.type = "text"; title.placeholder = "Untitled"; title.value = card.title;
+  title.setAttribute("aria-label", "Title");
+  title.addEventListener("input", () => { if (card.locked) return; card.title = title.value; touch(card); });
+  const lock = document.createElement("span"); lock.className = "lock"; lock.textContent = "🔒"; lock.title = "The title is locked to the file name";
+  titleRow.append(title, lock);
+  const small = document.createElement("div"); small.className = "small"; small.textContent = "Title locks to the file name on first save";
+  const status = document.createElement("div"); status.className = "cardstatus";
+
+  const btns = document.createElement("div"); btns.className = "btns";
+  const mk = (label, cls, handler, disabledNote) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.className = "btn-" + cls;
+    if (disabledNote) { b.disabled = true; b.title = disabledNote; } else { b.addEventListener("click", () => handler(b)); }
+    const wrap = document.createElement("span"); wrap.className = "btnwrap"; wrap.appendChild(b);
+    btns.appendChild(wrap); return b;
+  };
+  mk("Save", "save", (b) => saveCard(card, { btn: b }));
+  mk("Save As", "saveas", (b) => saveAs(card, { btn: b }));
+  mk("Copy", "copy", (b) => copyCard(card, b));
+  mk("Pin", "pin", null, "Available in Phase 3");
+  mk("Collapse", "collapse", null, "Available in Phase 3");
+  mk("Delete", "delete", () => deleteCard(card));
+
+  const body = document.createElement("textarea");
+  body.className = "body"; body.value = card.text; body.spellcheck = true;
+  body.setAttribute("aria-label", "Text");
+  body.addEventListener("input", () => { card.text = body.value; touch(card); });
+
+  const meta = document.createElement("div"); meta.className = "meta";
+  root.append(titleRow, small, btns, status, body, meta);
+  root.addEventListener("click", (ev) => { if (!ev.target.closest("button")) ensureVisible(card.id); });
+  root.addEventListener("focusin", (ev) => {      // keyboard focus (Tab); mouse focus is handled by the click above, after mouse-up
+    if (Date.now() - lastPointerAt > 400 && !ev.target.closest("button")) ensureVisible(card.id);
+  });
+  const li = buildIndexItem(card);
+  els.set(card.id, { root, title, body, meta, li, lock, small, status });
+  refreshTitleUi(card); updateMeta(card); updateIndexItem(card);
+  return root;
+}
+function renderAll() {
+  const grid = $("grid"), idx = $("index"); grid.textContent = ""; idx.textContent = ""; els.clear();
+  displayOrder([...cards.values()]).forEach((c) => { grid.appendChild(buildCard(c)); idx.appendChild(els.get(c.id).li); });
+  updateChrome(); schedulePick();
+}
+
+// Feedback is a floating note, not a change to the button label, so the button row never changes width or wraps.
+function toastAt(btn, text, ms) {
+  const wrap = btn && btn.parentElement; if (!wrap) return;
+  const old = wrap.querySelector(".toast"); if (old) old.remove();
+  const n = document.createElement("span"); n.className = "toast"; n.textContent = text; wrap.appendChild(n);
+  setTimeout(() => n.remove(), ms || 1200);
+}
+async function copyCard(card, btn) {
+  const flash = (t) => toastAt(btn, t);
+  if (card.text === "") return flash("Nothing to copy");
+  try { await navigator.clipboard.writeText(card.text); return flash("Copied"); }
+  catch (e) { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement("textarea"); ta.value = card.text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy"); ta.remove();
+    flash(ok ? "Copied" : "Copy failed");
+  } catch (e) { flash("Copy failed"); }
+}
+
+async function deleteCard(card) {
+  const name = card.title.trim() || "Untitled";
+  const st = unsavedState(card);
+  const warn = st === "never-saved" ? "\n\nThe text has not been saved to a file and will be lost." : st === "unsaved" ? "\n\nThe latest changes have not been saved to the file and will be lost." : "";
+  if (!window.confirm('Delete "' + name + '"?\n\nThis removes the container only. No file on disk is touched.' + warn)) return;
+  cards.delete(card.id); dirty.delete(card.id); handles.delete(card.id);
+  const e = els.get(card.id); if (e) { e.root.remove(); if (e.li) e.li.remove(); }
+  els.delete(card.id); updateChrome(); schedulePick();
+  try { await dbDeleteCard(card.id); }
+  catch (err) { banner("err", "Could not remove the container from browser storage (" + errStr(err) + "). It may reappear on reload."); }
+}
+
+// ---------- saving to files ----------
+function refreshTitleUi(card) {
+  const e = els.get(card.id); if (!e) return;
+  e.title.value = card.title; e.title.readOnly = !!card.locked;
+  e.lock.hidden = !card.locked; e.small.hidden = !!card.locked;
+}
+function clearPanel(card) { const e = els.get(card.id); if (e) e.status.textContent = ""; }
+function showPanel(card, kind, extra) {
+  const e = els.get(card.id); if (!e) return;
+  const name = card.fileName || card.title || "this file";
+  e.status.textContent = "";
+  const p = document.createElement("div"); p.className = "panel" + (kind === "samefile" ? " warn" : ""); p.setAttribute("role", "alert"); p.dataset.kind = kind;
+  const m = document.createElement("div"); m.className = "pmsg"; m.textContent = failureMessage(kind, name, extra); p.appendChild(m);
+  const row = document.createElement("div"); row.className = "pbtns"; p.appendChild(row);
+  const add = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.addEventListener("click", () => fn(b)); row.appendChild(b); };
+  const asNew = () => add("Save As new file", (b) => saveAs(card, { btn: b }));
+  if (kind === "missing") { asNew(); add("Re-create file here", (b) => saveCard(card, { force: true, btn: b })); }
+  else if (kind === "changed") { asNew(); add("Overwrite anyway", (b) => saveCard(card, { force: true, btn: b })); }
+  else if (kind === "locked") { asNew(); add("Try again", (b) => saveCard(card, { btn: b })); }
+  else if (kind === "permission") { add("Allow saving", (b) => allowSaving(card, b)); asNew(); }
+  else if (kind === "linklost") { asNew(); }
+  else if (kind === "error") { asNew(); add("Try again", (b) => saveCard(card, { btn: b })); }
+  add("Dismiss", () => clearPanel(card));
+  e.status.appendChild(p);
+  ensureVisible(card.id);
+}
+async function allowSaving(card, btn) {
+  const h = handles.get(card.id); if (!h) return;
+  try {
+    const p = await h.requestPermission({ mode: "readwrite" });
+    if (p === "granted") { clearPanel(card); toastAt(btn, "Allowed"); } else toastAt(btn, "Not allowed", 2000);
+  } catch (err) { showPanel(card, "error", errStr(err)); }
+}
+
+// Steps 3 and 4 of the save routine: write the text, then remember the file's new lastModified.
+async function writeCard(card, h) {
+  const text = card.text;
+  try {
+    const w = await h.createWritable(); await w.write(text); await w.close();
+  } catch (err) {
+    const kind = classifyWriteError(err && err.name);
+    showPanel(card, kind, errStr(err)); console.error("write failed", err);
+    return false;
+  }
+  try { card.lastModified = (await h.getFile()).lastModified; } catch (err) { card.lastModified = null; }
+  card.savedText = text; card.savedAt = Date.now();
+  markDirty(card.id); updateMeta(card); updateIndexItem(card);
+  return true;
+}
+
+// The five-step routine for a container that is already linked to a file.
+async function saveCard(card, opts) {
+  opts = opts || {};
+  if (busy.has(card.id)) return;
+  const h = handles.get(card.id);
+  if (!h) return saveAs(card, opts);                 // never saved: the first Save is a Save As
+  busy.add(card.id);
+  try {
+    clearPanel(card);
+    // 5. permission (asked here, inside the click, if it is not already granted)
+    let perm;
+    try {
+      perm = await h.queryPermission({ mode: "readwrite" });
+      if (perm === "prompt") perm = await h.requestPermission({ mode: "readwrite" });
+    } catch (err) { perm = "denied"; }
+    if (perm !== "granted") { showPanel(card, "permission"); return false; }
+    // 1 and 2. does the file still exist, and is it unchanged since our last save?
+    let file;
+    try { const f = await h.getFile(); file = { ok: true, lastModified: f.lastModified }; }
+    catch (err) { file = { ok: false, errorName: err && err.name }; }
+    const decision = checkBeforeWrite(file, card.lastModified);
+    if (!opts.force) {
+      if (decision.action === "missing") { showPanel(card, "missing"); return false; }
+      if (decision.action === "unreadable") { showPanel(card, classifyWriteError(decision.errorName), decision.errorName); return false; }
+      if (decision.action === "changed") { showPanel(card, "changed"); return false; }
+    }
+    // 3 and 4.
+    const ok = await writeCard(card, h);
+    if (ok) toastAt(opts.btn, "Saved");
+    return ok;
+  } finally { busy.delete(card.id); }
+}
+
+async function saveAs(card, opts) {
+  opts = opts || {};
+  if (busy.has(card.id)) return;
+  if (typeof window.showSaveFilePicker !== "function") { showPanel(card, "error", "this browser cannot save to files"); return false; }
+  const base = { suggestedName: defaultFileName(card.title, Date.now()), types: [{ description: "Text files", accept: { "text/plain": [".txt", ".md"] } }], excludeAcceptAllOption: true };
+  const fallback = Object.assign({ id: "notetaker", startIn: "documents" }, base);
+  let h;
+  try {
+    // Start in the folder of the last saved file (to be checked by hand: does this survive a restart?); otherwise Documents.
+    try { h = await window.showSaveFilePicker(lastHandle ? Object.assign({ startIn: lastHandle }, base) : fallback); }
+    catch (err) { if (err && err.name === "AbortError") return false; h = await window.showSaveFilePicker(fallback); }
+  } catch (err) {
+    if (err && err.name === "AbortError") return false;       // cancelled: nothing changes and the title stays editable
+    showPanel(card, "error", errStr(err)); return false;
+  }
+  busy.add(card.id);
+  try {
+    clearPanel(card);
+    handles.set(card.id, h); lastHandle = h;
+    card.fileName = h.name; card.title = stripExtension(h.name); card.locked = true; card.lastEdited = Date.now();
+    refreshTitleUi(card);
+    try { await dbPutHandle(card.id, h); await dbPutHandle("__last", h); }
+    catch (err) { banner("err", "Could not remember the link to \"" + h.name + "\" (" + errStr(err) + "). It will need Save As again after a restart."); }
+    try { card.lastModified = (await h.getFile()).lastModified; } catch (err) { card.lastModified = null; }
+    markDirty(card.id);
+    const ok = await writeCard(card, h);                    // the dialog already confirmed any replace, so no change check here
+    if (ok) toastAt(opts.btn, "Saved");
+    // warn if another container is linked to the same file
+    for (const [otherId, oh] of handles) {
+      if (otherId === card.id) continue;
+      let same = false; try { same = await oh.isSameEntry(h); } catch (err) { /* ignore */ }
+      if (same) { const other = cards.get(otherId); if (other) { showPanel(card, "samefile", other.title || "Untitled"); showPanel(other, "samefile", card.title || "Untitled"); } break; }
+    }
+    return ok;
+  } finally { busy.delete(card.id); }
+}
+
+function addCard() {
+  const c = newCard(Date.now(), crypto.randomUUID());
+  cards.set(c.id, c);
+  const root = buildCard(c);
+  $("grid").prepend(root); $("index").prepend(els.get(c.id).li);
+  updateChrome();
+  markDirty(c.id); flush();
+  els.get(c.id).title.focus();
+  root.scrollIntoView({ behavior: "smooth", block: "start" }); lockId = c.id; lockY = null; clearTimeout(lockTimer); lockTimer = setTimeout(settleLock, 250); setActive(c.id);
+}
+$("newCard").addEventListener("click", addCard);
+
+// ---------- start-up ----------
+(async function init() {
+  try {
+    const stored = await dbAllCards();
+    stored.forEach((c) => cards.set(c.id, normalizeCard(c)));
+    setBackup("ok");
+    try { (await dbAllHandles()).forEach(([key, h]) => { if (key === "__last") lastHandle = h; else if (cards.has(key)) handles.set(key, h); }); }
+    catch (e) { banner("err", "Could not restore the links to saved files (" + errStr(e) + "). Use Save As to link them again."); }
+  } catch (e) {
+    backupBroken = true; setBackup("failed");
+    banner("err", "Browser storage is unavailable (" + errStr(e) + "). You can edit, but nothing is backed up.");
+  }
+  renderAll();
+  // Step 5 of the routine, on load: a container linked to a file whose permission is not granted gets a "click to allow" prompt.
+  for (const c of cards.values()) {
+    if (!c.fileName) continue;
+    const h = handles.get(c.id);
+    if (!h) { showPanel(c, "linklost"); continue; }
+    try { if ((await h.queryPermission({ mode: "readwrite" })) !== "granted") showPanel(c, "permission"); }
+    catch (e) { showPanel(c, "error", errStr(e)); }
+  }
+
+  // Ask Chrome not to evict this site's data under storage pressure (best effort).
+  if (navigator.storage && navigator.storage.persist) {
+    try { const p = await navigator.storage.persist(); $("backup").title = p ? "Storage is persistent" : "Storage is best-effort (the browser may evict it under pressure)"; }
+    catch (e) { /* ignore */ }
+  }
+  // Warn (do not block) if the app is already open in another tab: two tabs would overwrite each other's backup.
+  if (navigator.locks) {
+    navigator.locks.request("notetaker-instance", { ifAvailable: true }, (lock) => {
+      if (!lock) { banner("warn", "NoteTaker is already open in another tab or window. Edits made in both places can overwrite each other. Close one of them."); return; }
+      return new Promise(() => {});    // hold the lock until this page closes
+    });
+  }
+})();
+</script>
+</body>
+</html>

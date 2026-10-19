@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+# Windows script files need CRLF to run reliably in cmd and WSH
+*.bat text eol=crlf
+*.vbs text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.zip binary

@@ -1,0 +1,44 @@
+/* Mint profile: tokens, embedded font and logo. Token values are the approved mockup's Mint blocks (Mint hexes are never altered);
+   entries marked [deviation] differ from the mockup and are listed in the build notes. */
+
+/* font: Latin subset of Lato 2.015 (see the notice at the top of mint-profile.js); weights 300, 400, 700 only */
+@font-face { font-family: "NT Brand Sans"; font-weight: 300; font-style: normal; font-display: block; src: url({{FONT_LIGHT}}) format("woff2"); }
+@font-face { font-family: "NT Brand Sans"; font-weight: 400; font-style: normal; font-display: block; src: url({{FONT_REGULAR}}) format("woff2"); }
+@font-face { font-family: "NT Brand Sans"; font-weight: 700; font-style: normal; font-display: block; src: url({{FONT_BOLD}}) format("woff2"); }
+@font-face { font-family: "NT Brand Sans"; font-weight: 400; font-style: italic; font-display: block; src: url({{FONT_ITALIC}}) format("woff2"); }   /* the app's only italic: "untitled" header-list entries */
+
+/* light (also used when nothing else matches) */
+:root[data-profile="mint"] {
+  --bg: #FFFFFF; --card: #EDEEF0; --field: #FFFFFF; --field-locked: #CFD8DB;
+  --text: #475054; --muted: #626E73; --heading: #184B9A;
+  --line: {{LINE_LIGHT}}; --card-line: transparent;
+  --accent: {{ACCENT_LIGHT}}; --accent-bg: #CFD8DB; --focus: #184B9A; --icon: {{ICON_LIGHT}}; --active-bg: {{ACTIVE_LIGHT}};   /* [deviation] header-list symbols are text glyphs: blue, not the mockup's orange (orange text must be large or bold) */
+  --cta-bg: #F48130; --cta-text: #243C7A; --btn-bg: #184B9A; --btn-text: #FFFFFF; --btn-line: #184B9A;
+  --sig: transparent;
+  --ok: {{OK_LIGHT}}; --bad: {{BAD_LIGHT}};
+  --warn: {{WARN_LIGHT}}; --warn-bg: {{WARNBG_LIGHT}}; --warn-line: {{WARNLINE_LIGHT}}; --err-bg: {{ERRBG_LIGHT}}; --err-line: {{ERRLINE_LIGHT}};
+  --radius-card: 20px; --radius-btn: 999px;
+  --font-ui: "NT Brand Sans", Arial, Helvetica, sans-serif;
+  --fw-head: 300; --cta-size: 19px; --cta-weight: 700;
+  --logo-w: 190px; --logo-plate: transparent; --logo-plate-pad: 0;
+  --h1-size: 24px; --h1-lh: 30px;
+  color-scheme: light;
+}
+/* dark: system setting, no manual choice */
+@media (prefers-color-scheme: dark) {
+  :root[data-profile="mint"]:not([data-theme="light"]) {
+{{DARK}}
+  }
+}
+/* dark: chosen with the button */
+:root[data-profile="mint"][data-theme="dark"] {
+{{DARK}}
+}
+
+/* logo: drawn as a background of the slot at the top of the container-list column (width set, height from the logo's own proportions; never recoloured, rotated, cropped or split from its tagline).
+   In dark the logo sits on a light plate: the plate is the slot's own background and padding. */
+:root[data-profile="mint"] #logoSlot {
+  display: block; box-sizing: content-box; width: var(--logo-w); aspect-ratio: 111.22 / 54.6; padding: var(--logo-plate-pad);
+  background-color: var(--logo-plate); border-radius: var(--radius-card);
+  background-image: url({{LOGO}}); background-repeat: no-repeat; background-position: center; background-size: contain; background-origin: content-box;
+}
