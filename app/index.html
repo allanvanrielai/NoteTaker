@@ -175,7 +175,7 @@ function themeLabel(isDark) {
     <h1>NoteTaker</h1>
   </div>
   <div class="hrow" id="hrow2">
-    <span id="backup" class="ok">Backup: starting…</span>
+    <span id="backup" class="ok busy">Backup: starting…</span>
     <button id="newCard" class="primary">New container</button>
     <button id="openBtn" class="btn-open" type="button" title="Open an existing .txt or .md file into a new container">Open file…</button>
     <span id="count"></span>
@@ -420,7 +420,7 @@ let flushTimer = null, flushChain = Promise.resolve(), backupBroken = false;
 function setBackup(state) {
   const el = $("backup");
   if (state === "ok")      { el.className = "ok";  el.textContent = "Backup: up to date"; }
-  if (state === "pending") { el.className = "ok";  el.textContent = "Backup: writing…"; }
+  if (state === "pending") { el.className = "ok busy"; el.textContent = "Backup: writing…"; }
   if (state === "failed")  { el.className = "bad"; el.textContent = "BACKUP FAILED: text is not protected"; }
 }
 function markDirty(id) {

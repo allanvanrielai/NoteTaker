@@ -146,7 +146,7 @@ const EXPECT = {
   "default light": { bg: "#EEF2F7", card: "#FFFFFF", text: "#253D52", line: "#4880AE", cta: "#253D52", ctaText: "#FFFFFF", btn: "#325A7A", heading: "#253D52", radiusCard: "14px", radiusBtn: "8px", fontStart: /^Arial/, h1w: "700" },
   "default dark": { bg: "#253D52", card: "#325A7A", text: "#FFFFFF", line: "#A0C2DB", cta: "#A0C2DB", ctaText: "#253D52", btn: "#EEF2F7", heading: "#FFFFFF", radiusCard: "14px", radiusBtn: "8px", fontStart: /^Arial/, h1w: "700" },
   "mint light": { bg: "#FFFFFF", card: "#EDEEF0", text: "#475054", line: "{{LINE_LIGHT}}", cta: "#F48130", ctaText: "#243C7A", btn: "#184B9A", heading: "#184B9A", radiusCard: "20px", radiusBtn: "999px", fontStart: /^"NT Brand Sans"/, h1w: "300" },
-  "mint dark": { bg: "#243C7A", card: "#184B9A", text: "#FFFFFF", line: "#85C4EB", cta: "#F48130", ctaText: "#243C7A", btn: "#184B9A", heading: "#FFFFFF", radiusCard: "20px", radiusBtn: "999px", fontStart: /^"NT Brand Sans"/, h1w: "300" },
+  "mint dark": { bg: "#0D0F10", card: "#222629", text: "#FFFFFF", line: "#7A8388", cta: "#F48130", ctaText: "#0D0F10", btn: "#184B9A", heading: "#FFFFFF", radiusCard: "20px", radiusBtn: "999px", fontStart: /^"NT Brand Sans"/, h1w: "300" },
 };
 const MINT_LINE_LIGHT = process.env.MINT_LINE_LIGHT || "#626E73";
 EXPECT["mint light"].line = MINT_LINE_LIGHT.toUpperCase();
@@ -221,7 +221,7 @@ try {
   await tab.reload();
   check("S3 Mint survives a reload (and a stored theme choice stays independent)", (await ev("document.documentElement.getAttribute('data-profile')")) === "mint" && (await ev("document.documentElement.getAttribute('data-theme')")) === "light");
   await ev("document.getElementById('themeBtn').click()"); await sleep(200);
-  check("S3 switching theme in Mint keeps Mint, and the button follows", (await ev("document.documentElement.getAttribute('data-profile')")) === "mint" && (await ev("document.documentElement.getAttribute('data-theme')")) === "dark" && rgbHex(await cs("body", "backgroundColor")) === "#243C7A" && (await ev("document.getElementById('themeBtn').textContent")) === "☀ Light");
+  check("S3 switching theme in Mint keeps Mint, and the button follows", (await ev("document.documentElement.getAttribute('data-profile')")) === "mint" && (await ev("document.documentElement.getAttribute('data-theme')")) === "dark" && rgbHex(await cs("body", "backgroundColor")) === "#0D0F10" && (await ev("document.getElementById('themeBtn').textContent")) === "☀ Light");
   await ev("document.querySelector('.segbtns button[data-profile=default]').click()"); await sleep(250);
   check("S3 switching back to Default (theme kept) and the logo goes away", (await ev("document.documentElement.getAttribute('data-profile')")) === null && rgbHex(await cs("body", "backgroundColor")) === "#253D52" && (await ev("localStorage.getItem('notetaker-profile')")) === "default" && (await ev("getComputedStyle(document.getElementById('logoSlot')).display")) === "none");
   await tab.reload();
@@ -263,8 +263,8 @@ try {
     const H = await ev(HDR);
     if (profile === "mint") {
       const plateDark = theme === "dark";
-      check(tag + "logo: width set, proportions kept (111.22:54.6), plate " + (plateDark ? "#CFD8DB with 14px 22px padding" : "none"), H.slot.display === "block" && H.slot.rect && Math.abs((H.slot.rect.b - H.slot.rect.t - (plateDark ? 28 : 0)) / (H.slot.rect.r - H.slot.rect.l - (plateDark ? 44 : 0)) - 54.6 / 111.22) < 0.01 &&
-        (plateDark ? H.slot.padding === "14px 22px" && rgbHex(H.slot.bg) === "#CFD8DB" : H.slot.padding === "0px" && /rgba\(0, 0, 0, 0\)|transparent/.test(H.slot.bg)) && H.slot.bgImg.startsWith("url(") && H.slot.role === "img", H.slot);
+      check(tag + "logo: width set, proportions kept (111.22:54.6), plate " + (plateDark ? "#CFD8DB with 8px 14px padding" : "none"), H.slot.display === "block" && H.slot.rect && Math.abs((H.slot.rect.b - H.slot.rect.t - (plateDark ? 16 : 0)) / (H.slot.rect.r - H.slot.rect.l - (plateDark ? 28 : 0)) - 54.6 / 111.22) < 0.01 &&
+        (plateDark ? H.slot.padding === "8px 14px" && rgbHex(H.slot.bg) === "#CFD8DB" : H.slot.padding === "0px" && /rgba\(0, 0, 0, 0\)|transparent/.test(H.slot.bg)) && H.slot.bgImg.startsWith("url(") && H.slot.role === "img", H.slot);
     } else check(tag + "no logo", H.slot.display === "none" && H.slot.rect === null, H.slot);
   }
 
@@ -287,7 +287,7 @@ try {
     const sid = (await tab.send("Page.addScriptToEvaluateOnNewDocument", { source: rec })).identifier;
     await tab.reload(); await sleep(900);
     const fr = await ev("window.__frames");
-    const wantBg = theme === "light" ? "#FFFFFF" : "#243C7A";
+    const wantBg = theme === "light" ? "#FFFFFF" : "#0D0F10";
     check(`S7 Mint ${theme}: every frame from the very first has Mint set and Mint's background (never Default's)`, fr.length >= 5 && fr.every((f) => f.prof === "mint" && f.bg.toUpperCase() === wantBg), fr.slice(0, 3));
     const firstText = fr.find((f) => f.h1);
     check(`S7 Mint ${theme}: the font is already loaded in the first frame that has text (no swap from a fallback font)`, firstText && firstText.font === true && /300:loaded/.test(firstText.faces), firstText);
@@ -300,7 +300,7 @@ try {
     const H = await ev(HDR), t2 = `Mint ${theme} ${w}x${h}: `;
     check(t2 + "header sticky, " + H.h + " px, nothing clipped, no page overflow", H.pos === "sticky" && H.hdrVar === H.h + "px" && !H.clip && !H.docOverflow, H);
     check(t2 + "row 2 fits on one line with the Profile label and group: backup, New, Open, count, Profile, group, theme", H.labelShown && H.kids.every((k, i) => i === 0 || k.l >= H.kids[i - 1].r - 0.5) && H.kids.every((k) => k.b - k.t < 44 && k.r <= H.hdrRight - 15) && H.seg && H.seg.r <= H.kids[H.kids.length - 1].l, H.kids);
-    check(t2 + "logo (190 px wide) is at the top of the container-list column, left-aligned with the list box and above it, and not in the header", H.slot.rect && H.slot.inSide && Math.abs((H.slot.rect.r - H.slot.rect.l) - (190 + (theme === "dark" ? 44 : 0))) < 1 && Math.abs(H.slot.rect.l - H.sideBox.l) < 1 && H.slot.rect.b <= H.sideBox.t && H.slot.rect.t >= H.hdrBottom - 0.5 && !H.slot.inHeader, [H.slot, H.sideBox]);
+    check(t2 + "logo (" + (theme === "dark" ? "120" : "190") + " px wide) is at the top of the container-list column, left-aligned with the list box and above it, and not in the header", H.slot.rect && H.slot.inSide && Math.abs((H.slot.rect.r - H.slot.rect.l) - (theme === "dark" ? 120 + 28 : 190)) < 1 && Math.abs(H.slot.rect.l - H.sideBox.l) < 1 && H.slot.rect.b <= H.sideBox.t && H.slot.rect.t >= H.hdrBottom - 0.5 && !H.slot.inHeader, [H.slot, H.sideBox]);
     check(t2 + "the heading is 24 px Light in Mint", (await cs("h1", "fontSize")) === "24px" && (await cs("h1", "fontWeight")) === "300");
     console.log("      " + t2 + "header " + H.h + " px (Default is 76; was 52 before Phase 2); logo " + (H.slot.rect ? Math.round(H.slot.rect.r - H.slot.rect.l) + " x " + Math.round(H.slot.rect.b - H.slot.rect.t) : "-") + " px incl. plate; heading font " + await cs("h1", "fontFamily").then((f) => f.split(",")[0]) + " " + await cs("h1", "fontWeight") + " " + await cs("h1", "fontSize"));
     await ev("setBackup('failed')"); await sleep(200); const F = await ev(HDR);
@@ -321,7 +321,7 @@ try {
         if (hasText && GREEN.includes(col)) out.greenText.push({ el: el.tagName + '#' + el.id, col, bg });
         if (hasText && ORANGE.includes(col)) out.orangeText.push({ el: el.tagName + '#' + el.id, col, bg, w: cs.fontWeight, px: cs.fontSize }); }
       const p = document.querySelector('button.primary'), pc = getComputedStyle(p); out.ctaOk = { bg: h(parse(pc.backgroundColor)), text: h(parse(pc.color)), weight: pc.fontWeight, px: parseFloat(pc.fontSize) }; return out; })()`);
-    check(`S9 Mint ${theme}: no white text on orange, and the orange CTA uses bold #243C7A text at 18.66 px or larger`, r.whiteOnOrange.length === 0 && r.ctaOk.bg === "#F48130" && r.ctaOk.text === "#243C7A" && Number(r.ctaOk.weight) >= 700 && r.ctaOk.px >= 18.66, r);
+    check(`S9 Mint ${theme}: no white text on orange, and the orange CTA uses bold ${theme === "dark" ? "#0D0F10" : "#243C7A"} text at 18.66 px or larger`, r.whiteOnOrange.length === 0 && r.ctaOk.bg === "#F48130" && r.ctaOk.text === (theme === "dark" ? "#0D0F10" : "#243C7A") && Number(r.ctaOk.weight) >= 700 && r.ctaOk.px >= 18.66, r);
     check(`S9 Mint ${theme}: green text appears only on the white page background in light (never on grey panels); orange text only large or bold`, (theme === "dark" || r.greenText.every((g) => g.bg === "#FFFFFF")) && r.orangeText.every((o) => Number(o.w) >= 700 || parseFloat(o.px) >= 24), r);
     console.log("      Mint " + theme + ": green text elements " + JSON.stringify(r.greenText) + "; orange text elements " + JSON.stringify(r.orangeText));
   }

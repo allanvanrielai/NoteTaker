@@ -1,0 +1,11 @@
+  /* Mint dark only: header band, status dot, smaller logo plate. {{SEL}} is replaced by each of the two dark selectors, so none of this can reach light or Default. */
+  {{SEL}} header { background: var(--band); color: var(--band-text); }
+  {{SEL}} header #count, {{SEL}} header #profileLabel { color: var(--band-muted); }
+  {{SEL}} header .segbtns, {{SEL}} header #themeBtn { border-color: var(--band-line); }
+  {{SEL}} header .segbtns button[aria-pressed="true"] { background: var(--band-seg-on); color: var(--band-seg-on-text); }
+  /* backup status: light text plus a dot (green up to date, hollow amber ring while starting/writing, red on failure) */
+  {{SEL}} header #backup, {{SEL}} header #backup.ok, {{SEL}} header #backup.bad { color: var(--band-text); display: inline-flex; align-items: center; gap: 6px; }
+  {{SEL}} header #backup::before { content: ""; flex: none; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; background: var(--dot-ok); border: 2px solid var(--dot-ok); }
+  {{SEL}} header #backup.busy::before { background: transparent; border-color: var(--dot-busy); }
+  {{SEL}} header #backup.bad::before { background: var(--dot-bad); border-color: var(--dot-bad); }
+  {{SEL}} #logoSlot { border-radius: 14px; }

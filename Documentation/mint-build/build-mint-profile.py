@@ -14,6 +14,9 @@ def datauri(path, mime):
 dark = VALUES["dark_block"]
 css = open(os.path.join(here, "mint-profile.template.css"), encoding="utf-8").read()
 css = css.replace("{{DARK}}", dark)
+rules = open(os.path.join(here, "mint-dark-rules.css"), encoding="utf-8").read()
+css = css.replace("{{DARK_RULES_SYSTEM}}", rules.replace("{{SEL}}", ':root[data-profile="mint"]:not([data-theme="light"])').rstrip("\n"))
+css = css.replace("{{DARK_RULES_MANUAL}}", rules.replace("{{SEL}}", ':root[data-profile="mint"][data-theme="dark"]').rstrip("\n"))
 for k, v in VALUES["light"].items():
     css = css.replace("{{" + k + "}}", str(v))
 css = css.replace("{{FONT_LIGHT}}", datauri("Light.woff2", "font/woff2")).replace("{{FONT_REGULAR}}", datauri("Regular.woff2", "font/woff2")).replace("{{FONT_BOLD}}", datauri("Bold.woff2", "font/woff2")).replace("{{FONT_ITALIC}}", datauri("Italic.woff2", "font/woff2"))

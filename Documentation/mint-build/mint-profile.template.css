@@ -29,11 +29,13 @@
   :root[data-profile="mint"]:not([data-theme="light"]) {
 {{DARK}}
   }
+{{DARK_RULES_SYSTEM}}
 }
 /* dark: chosen with the button */
 :root[data-profile="mint"][data-theme="dark"] {
 {{DARK}}
 }
+{{DARK_RULES_MANUAL}}
 
 /* logo: drawn as a background of the slot at the top of the container-list column (width set, height from the logo's own proportions; never recoloured, rotated, cropped or split from its tagline).
    In dark the logo sits on a light plate: the plate is the slot's own background and padding. */
